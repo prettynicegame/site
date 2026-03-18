@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Walker Simulator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #000; }
+    canvas { display: block; }
+    #hud {
+      position: fixed; top: 12px; left: 12px;
+      color: #fff; font: 13px/1.7 monospace;
+      background: rgba(0,0,0,0.5); padding: 10px 14px; border-radius: 6px;
+      pointer-events: none;
+    }
+    #modeTag {
+      position: fixed; top: 12px; right: 12px;
+      color: #fff; font: bold 14px monospace;
+      background: rgba(0,0,0,0.5); padding: 8px 14px; border-radius: 6px;
+      pointer-events: none;
+    }
+    #hungerWrap {
+      position: fixed; bottom: 58px; left: 50%; transform: translateX(-50%);
+      width: 200px; pointer-events: none;
+    }
+    #hungerLabel {
+      color: #fff; font: 11px monospace; text-align: center;
+      margin-bottom: 4px; text-shadow: 0 1px 3px #000;
+    }
+    #hungerBg {
+      width: 100%; height: 10px; background: rgba(0,0,0,0.45);
+      border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+    }
+    #hungerBar {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, #d4a012, #f0c060);
+      border-radius: 5px; transition: background 0.2s;
+    }
+    #staminaWrap {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      width: 200px; pointer-events: none;
+    }
+    #staminaLabel {
+      color: #fff; font: 11px monospace; text-align: center;
+      margin-bottom: 4px; text-shadow: 0 1px 3px #000;
+    }
+    #staminaBg {
+      width: 100%; height: 10px; background: rgba(0,0,0,0.45);
+      border-radius: 5px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+    }
+    #staminaBar {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, #2ecc71, #27ae60);
+      border-radius: 5px; transition: background 0.2s;
+    }
+
+    /* ── Biome selection screen ── */
+    #selectScreen {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      font-family: monospace;
+    }
+    #selectScreen h1 {
+      text-align: center; color: #fff;
+      font-size: 2rem; margin-bottom: 2rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      text-shadow: 0 0 20px rgba(100,200,255,0.4);
+    }
+    .biome-row {
+      display: flex; gap: 2rem; justify-content: center;
+      flex-wrap: wrap;
+    }
+    .biome-card {
+      width: 260px; border-radius: 14px; overflow: hidden;
+      cursor: pointer; transition: transform 0.18s, box-shadow 0.18s;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      border: 2px solid rgba(255,255,255,0.1);
+    }
+    .biome-card:hover { transform: translateY(-6px) scale(1.03); box-shadow: 0 12px 40px rgba(0,0,0,0.7); }
+    .card-banner {
+      height: 140px; display: flex; align-items: center; justify-content: center; font-size: 4rem;
+    }
+    .savanna-banner { background: linear-gradient(180deg, #e8a020 0%, #c4762a 50%, #8b5a1a 100%); }
+    .prairie-banner { background: linear-gradient(180deg, #5bc8f5 0%, #7ec850 50%, #3a8a20 100%); }
+    .card-body {
+      background: rgba(20,20,40,0.92); padding: 1.1rem 1.3rem 1.4rem;
+      color: #ddd;
+    }
+    .card-body h2 { color: #fff; font-size: 1.2rem; margin: 0 0 0.4rem; letter-spacing: 0.08em; }
+    .card-body p  { font-size: 0.78rem; line-height: 1.5; color: #aaa; margin: 0 0 1rem; }
+    .card-body button {
+      width: 100%; padding: 0.55rem; border: none; border-radius: 7px;
+      font-family: monospace; font-size: 0.9rem; font-weight: bold;
+      cursor: pointer; letter-spacing: 0.06em; transition: filter 0.15s;
+    }
+    .card-body button:hover { filter: brightness(1.2); }
+    .btn-savanna { background: linear-gradient(90deg,#e8a020,#c4762a); color: #fff; }
+    .btn-prairie { background: linear-gradient(90deg,#4caf50,#2e7d32); color: #fff; }
+    .ice-banner   { background: linear-gradient(180deg, #b8d8f0 0%, #ddeeff 50%, #eef6ff 100%); }
+    .btn-ice      { background: linear-gradient(90deg,#7ec8e3,#3a8fbd); color: #fff; }
+
+    #inventory {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(10,10,20,0.92); border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 12px; padding: 1.2rem 2rem 1.4rem; color: #fff;
+      font: 14px/2 monospace; min-width: 240px; z-index: 50;
+      display: none;
+    }
+    #inventory h3 {
+      text-align: center; margin: 0 0 0.6rem; font-size: 1rem;
+      letter-spacing: 0.14em; border-bottom: 1px solid rgba(255,255,255,0.15);
+      padding-bottom: 0.5rem; color: #ddd;
+    }
+    .inv-row { display: flex; justify-content: space-between; gap: 2.5rem; }
+    .inv-val  { color: #f0c060; font-weight: bold; }
+    #treeHealthWrap {
+      position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%);
+      width: 180px; pointer-events: none; display: none;
+    }
+    #treeHealthLabel {
+      color: #fff; font: 11px monospace; text-align: center;
+      margin-bottom: 3px; text-shadow: 0 1px 3px #000;
+    }
+    #treeHealthBg {
+      width: 100%; height: 8px; background: rgba(0,0,0,0.45);
+      border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2);
+    }
+    #treeHealthBar {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg,#27ae60,#2ecc71);
+      border-radius: 4px; transition: width 0.15s, background 0.15s;
+    }
+    #hotbar {
+      position: fixed; bottom: 58px; right: 14px;
+      display: flex; flex-direction: column; gap: 6px; pointer-events: none;
+    }
+    .hb-slot {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 5px 10px 5px 7px;
+      font: 12px monospace; color: #bbb; min-width: 100px;
+    }
+    .hb-slot.active { border-color: #f0c060; color: #fff; background: rgba(240,192,96,0.18); }
+    .hb-key { font-size: 10px; color: #888; background: rgba(255,255,255,0.1); border-radius: 3px; padding: 1px 4px; }
+    .hb-slot.active .hb-key { color: #f0c060; }
+
+    /* ── Dialog / NPC conversation ── */
+    #dialog {
+      position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+      width: 650px; max-width: 92vw;
+      background: rgba(10, 7, 3, 0.96);
+      border: 2px solid rgba(160, 110, 40, 0.65);
+      border-radius: 10px; padding: 1.2rem 1.8rem 1rem;
+      font: 14px/1.65 monospace; color: #e0d0a8;
+      display: none; z-index: 60;
+      box-shadow: 0 6px 40px rgba(0,0,0,0.8);
+    }
+    #dialogName {
+      color: #f0c060; font-weight: bold; font-size: 0.95rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 0.55rem; padding-bottom: 0.4rem;
+      border-bottom: 1px solid rgba(240,192,96,0.2);
+    }
+    #dialogText { color: #ddd; margin-bottom: 0.8rem; font-style: italic; }
+    #dialogCoins { color: #f0c060; font-size: 0.83rem; margin-bottom: 0.6rem; }
+    #dialogList { margin-bottom: 0.4rem; }
+    .dlg-item { padding: 5px 10px; border-radius: 5px; color: #aaa; }
+    .dlg-item.sel {
+      background: rgba(240,192,96,0.15); color: #f0c060;
+      padding-left: 12px; border-left: 2px solid #f0c060;
+    }
+    #dialogHint {
+      font-size: 0.78rem; color: #555; margin-top: 0.6rem;
+      padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    #mapScreen {
+      position: fixed; inset: 0; z-index: 80;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.82);
+    }
+    #mapCanvas {
+      width: min(90vw, 90vh); height: min(90vw, 90vh);
+      border: 4px solid #8a6020; border-radius: 4px;
+      box-shadow: 0 8px 60px rgba(0,0,0,0.9);
+    }
+    #mapHint {
+      position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+      color: #c8a040; font: 13px monospace; letter-spacing: 0.08em;
+      background: rgba(0,0,0,0.72); padding: 6px 18px; border-radius: 6px;
+      border: 1px solid rgba(200,160,64,0.3);
+    }
+  </style>
+</head>
+<body>
+<div id="selectScreen">
+  <div>
+    <h1>Choose Your World</h1>
+    <div class="biome-row">
+      <div class="biome-card" onclick="startGame('savanna')">
+        <div class="card-banner savanna-banner">🌵</div>
+        <div class="card-body">
+          <h2>Savanna</h2>
+          <p>Dry golden grasslands dotted with flat-topped acacia trees and swaying dry grass.</p>
+          <button class="btn-savanna">Play Savanna</button>
+        </div>
+      </div>
+      <div class="biome-card" onclick="startGame('prairie')">
+        <div class="card-banner prairie-banner">🌸</div>
+        <div class="card-body">
+          <h2>Prairie</h2>
+          <p>Lush meadows with pine forests, short green grass, and scattered wildflowers.</p>
+          <button class="btn-prairie">Play Prairie</button>
+        </div>
+      </div>
+      <div class="biome-card" onclick="startGame('ice')">
+        <div class="card-banner ice-banner">❄️</div>
+        <div class="card-body">
+          <h2>Ice</h2>
+          <p>Frozen tundra blanketed in snow, with towering snow-dusted evergreen trees.</p>
+          <button class="btn-ice">Play Ice</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="hud">
+  WASD &nbsp;&mdash; Walk<br>
+  Shift &mdash; Sprint<br>
+  Space &mdash; Jump<br>
+  &larr; &rarr; &nbsp;&mdash; Rotate camera<br>
+  &uarr; &darr; &nbsp;&mdash; Tilt camera<br>
+  1 &mdash; First Person<br>
+  2 &mdash; Third Person<br>
+  C &nbsp;&nbsp;&nbsp;&mdash; Chop / pick up<br>
+  Q &nbsp;&nbsp;&nbsp;&mdash; Inventory<br>
+  3 &nbsp;&nbsp;&nbsp;&mdash; Equip axe<br>
+  4 &nbsp;&nbsp;&nbsp;&mdash; Hold wood<br>
+  5 &nbsp;&nbsp;&nbsp;&mdash; Hold berry<br>
+  6 &nbsp;&nbsp;&nbsp;&mdash; Super axe<br>
+  7 &nbsp;&nbsp;&nbsp;&mdash; Pickaxe<br>
+  E &nbsp;&nbsp;&nbsp;&mdash; Eat berry<br>
+  M &nbsp;&nbsp;&nbsp;&mdash; View map
+</div>
+<div id="inventory">
+  <h3>INVENTORY</h3>
+  <div class="inv-row"><span>Axe</span><span class="inv-val">x1</span></div>
+  <div class="inv-row"><span>Wood</span><span class="inv-val" id="woodCount">0</span></div>
+  <div class="inv-row"><span>Coins</span><span class="inv-val" id="coinCount">0</span></div>
+  <div class="inv-row"><span>Berries</span><span class="inv-val" id="berryCount">0</span></div>
+  <div class="inv-row" id="inv-superaxe" style="display:none"><span>Super Axe</span><span class="inv-val">x1</span></div>
+  <div class="inv-row" id="inv-pickaxe"  style="display:none"><span>Pickaxe</span><span class="inv-val">x1</span></div>
+</div>
+<div id="hotbar">
+  <div class="hb-slot active" id="hb-axe"><span class="hb-key">3</span>Axe</div>
+  <div class="hb-slot" id="hb-wood"><span class="hb-key">4</span>Wood &times;<span id="hbWoodCount">0</span></div>
+  <div class="hb-slot" id="hb-berries"><span class="hb-key">5</span>Berry &times;<span id="hbBerryCount">0</span></div>
+  <div class="hb-slot" id="hb-superaxe" style="display:none"><span class="hb-key">6</span>Super Axe</div>
+  <div class="hb-slot" id="hb-pickaxe"  style="display:none"><span class="hb-key">7</span>Pickaxe</div>
+</div>
+<div id="hungerWrap">
+  <div id="hungerLabel">HUNGER</div>
+  <div id="hungerBg"><div id="hungerBar"></div></div>
+</div>
+<div id="treeHealthWrap">
+  <div id="treeHealthLabel">TREE HEALTH</div>
+  <div id="treeHealthBg"><div id="treeHealthBar"></div></div>
+</div>
+<div id="staminaWrap">
+  <div id="staminaLabel">STAMINA</div>
+  <div id="staminaBg"><div id="staminaBar"></div></div>
+</div>
+<div id="modeTag">3RD PERSON</div>
+
+<div id="dialog">
+  <div id="dialogName"></div>
+  <div id="dialogText"></div>
+  <div id="dialogCoins"></div>
+  <div id="dialogList"></div>
+  <div id="dialogHint"></div>
+</div>
+<div id="mapScreen">
+  <canvas id="mapCanvas"></canvas>
+  <div id="mapHint">[M] Close Map</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+// ── Renderer ──────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ── Scene ─────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.FogExp2(0x87ceeb, 0.007);
+
+// ── Camera ────────────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 600);
+camera.rotation.order = 'YXZ';
+
+// ── Lighting ──────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+const sun = new THREE.DirectionalLight(0xfff5e0, 1.1);
+sun.position.set(80, 120, 60);
+sun.castShadow = true;
+Object.assign(sun.shadow.camera, { near: 1, far: 300, left: -80, right: 80, top: 80, bottom: -80 });
+sun.shadow.mapSize.set(2048, 2048);
+scene.add(sun);
+scene.add(sun.target);
+
+// ── Ground ────────────────────────────────────────────────────────────
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(600, 600),
+  new THREE.MeshPhongMaterial({ color: 0x888888, flatShading: true })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+
+// ── Low-poly mesh helpers ─────────────────────────────────────────────
+function mat(color) {
+  return new THREE.MeshPhongMaterial({ color, flatShading: true });
+}
+function box(w, h, d, color) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color));
+  m.castShadow = true;
+  return m;
+}
+function cyl(rt, rb, h, segs, color) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, segs), mat(color));
+  m.castShadow = true;
+  return m;
+}
+
+// ── Character ─────────────────────────────────────────────────────────
+const SKIN  = 0xf5a878;
+const SHIRT = 0xe74c3c;
+const PANTS = 0x2c3e50;
+const SHOES = 0x1a1a1a;
+const HAIR  = 0x4a2800;
+
+// Outfit mesh registries — populated during character build, recoloured by setOutfit()
+const shirtMeshes = [], pantsMeshes = [], shoesMeshes = [], capMeshes = [], sleeveMeshes = [];
+
+const char = new THREE.Group();
+
+// Torso — slightly tapered box
+const torso = box(0.50, 0.65, 0.26, SHIRT);
+torso.position.y = 1.08;
+char.add(torso);
+shirtMeshes.push(torso);
+
+// Head — dodecahedron with flat shading
+const headGroup = new THREE.Group();
+headGroup.position.y = 1.66;
+char.add(headGroup);
+
+const headMesh = new THREE.Mesh(
+  new THREE.DodecahedronGeometry(0.21, 0),
+  mat(SKIN)
+);
+headMesh.castShadow = true;
+headGroup.add(headMesh);
+
+// Baseball cap — dome sitting flush on top of dodecahedron head
+const CAP = 0x1a3c6e;  // navy blue
+
+// Dome: 6-sided cylinder, wider at base to hug head, sits from y≈0.10 up
+const capDome = cyl(0.14, 0.215, 0.22, 6, CAP);
+capDome.position.y = 0.21;
+headGroup.add(capDome);
+
+// Cap button on top
+const capButton = cyl(0.025, 0.025, 0.03, 6, 0x0d2137);
+capButton.position.y = 0.335;
+headGroup.add(capButton);
+
+// Brim — flat box protruding forward from the front face of the dome
+// dome base sits at y=0.10; brim attaches at that level
+const capBrim = box(0.28, 0.028, 0.22, CAP);
+capBrim.position.set(0, 0.105, 0.20);
+headGroup.add(capBrim);
+
+// Brim underside detail (slightly darker strip)
+const brimUnder = box(0.26, 0.015, 0.20, 0x122d55);
+brimUnder.position.set(0, 0.088, 0.20);
+headGroup.add(brimUnder);
+
+capMeshes.push(capDome, capButton, capBrim, brimUnder);
+
+// Eyes — embedded into front face (dodecahedron inradius ≈ 0.167 at R=0.21)
+// centre of each eye box sits at z=0.155 so front surface is flush with face
+[-0.07, 0.07].forEach(x => {
+  const eye = box(0.07, 0.045, 0.025, 0x111111);
+  eye.position.set(x, 0.04, 0.155);
+  headGroup.add(eye);
+});
+
+// Neck — short 5-sided cylinder
+const neck = cyl(0.07, 0.08, 0.10, 5, SKIN);
+neck.position.y = 1.46;
+char.add(neck);
+
+// Arms — pivot at shoulder, 5-sided cylinders
+function makeArm(side) {
+  const g = new THREE.Group();
+  g.position.set(side * 0.32, 1.30, 0);
+
+  const upper = cyl(0.07, 0.08, 0.34, 5, SHIRT);
+  upper.position.y = -0.17;
+  g.add(upper);
+  shirtMeshes.push(upper);
+
+  const lower = cyl(0.055, 0.07, 0.30, 5, SKIN);
+  lower.position.y = -0.49;
+  g.add(lower);
+  sleeveMeshes.push(lower);
+
+  // Hand — small faceted sphere
+  const hand = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), mat(SKIN));
+  hand.castShadow = true;
+  hand.position.y = -0.69;
+  g.add(hand);
+
+  return g;
+}
+const leftArm  = makeArm(-1);
+const rightArm = makeArm( 1);
+char.add(leftArm, rightArm);
+
+// Axe — handle points forward (+Z in arm space) so blade sticks outward, perpendicular to body.
+// rotation.x = PI/4 tilts handle 45° forward from vertical — diagonal between down and forward.
+const axeGroup = new THREE.Group();
+axeGroup.position.set(0.02, -0.69, 0); // at hand position
+axeGroup.rotation.x = Math.PI / 4;     // 45° angle from body; blade head stays perpendicular to handle
+
+// Handle: grip at y=0 (hand), blade end at y=0.44 (→ arm +Z = forward after rotation)
+const axeHandle = cyl(0.026, 0.033, 0.44, 5, 0x5c3a1a);
+axeHandle.position.set(0, 0.22, 0);
+axeGroup.add(axeHandle);
+
+// bladeGroup counter-rotates axeGroup's PI/4 tilt so its axes align with arm/world space.
+// bladeGroup Z = character's forward direction → blade extends straight forward.
+const bladeGroup = new THREE.Group();
+bladeGroup.position.set(0, 0.46, 0);   // at handle tip in axeGroup space
+// no rotation: bladeGroup axes align with axeGroup axes, so blade (+Z) is perpendicular to handle (+Y)
+
+// Blade body: extends forward in +Z (bladeGroup Z = world forward), thin in X, height in Y
+const axeBlade = box(0.11, 0.26, 0.26, 0x7a8fa0);
+axeBlade.position.set(0, 0, 0.13);
+bladeGroup.add(axeBlade);
+
+// Cutting edge at the far (forward) face
+const axeEdge = box(0.10, 0.26, 0.04, 0xc8d8e4);
+axeEdge.position.set(0, 0, 0.27);
+bladeGroup.add(axeEdge);
+
+// Poll at the back (where blade attaches to handle)
+const axePoll = box(0.10, 0.13, 0.06, 0x607080);
+axePoll.position.set(0, 0, 0);
+bladeGroup.add(axePoll);
+
+axeGroup.add(bladeGroup);
+
+rightArm.add(axeGroup);
+
+// Log in hand — shown when wood is equipped
+const logInHand = new THREE.Group();
+const heldLog = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.52, 6), mat(0x8b6340));
+heldLog.castShadow = true;
+logInHand.add(heldLog);
+logInHand.position.set(0.02, -0.60, 0); // at hand
+logInHand.rotation.x = Math.PI / 2;     // point forward like axe handle
+logInHand.visible = false;
+rightArm.add(logInHand);
+
+// Berry cluster in left hand
+const berryInHand = new THREE.Group();
+const berryPositions = [
+  [0,     0,     0.08],
+  [0.07,  0.06,  0.06],
+  [-0.07, 0.06,  0.06],
+  [0.04, -0.06,  0.09],
+  [-0.04,-0.06,  0.09],
+];
+const berryCols = [0xcc2244, 0xaa1133, 0xdd3355];
+berryPositions.forEach(([x, y, z], i) => {
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.055, 5, 4), mat(berryCols[i % 3]));
+  b.castShadow = true;
+  b.position.set(x, y, z);
+  berryInHand.add(b);
+});
+// Small stem
+const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.08, 4), mat(0x3a6b20));
+stem.position.set(0, 0.07, 0.07);
+berryInHand.add(stem);
+berryInHand.position.set(-0.02, -0.65, 0); // at left hand
+berryInHand.visible = false;
+leftArm.add(berryInHand);
+
+// Super axe — big version of the axe, held in rightArm
+const superAxeGroup = new THREE.Group();
+superAxeGroup.position.set(0.02, -0.69, 0);
+superAxeGroup.rotation.x = Math.PI / 4;
+const superHandle = cyl(0.042, 0.052, 0.80, 5, 0x3a1e08);
+superHandle.position.set(0, 0.40, 0);
+superAxeGroup.add(superHandle);
+const superBladeG = new THREE.Group();
+superBladeG.position.set(0, 0.82, 0);
+const superBlade = box(0.18, 0.52, 0.52, 0x7090b0);
+superBlade.position.set(0, 0, 0.26);
+superBladeG.add(superBlade);
+const superEdge = box(0.16, 0.52, 0.07, 0xc8dce8);
+superEdge.position.set(0, 0, 0.54);
+superBladeG.add(superEdge);
+const superPoll = box(0.16, 0.22, 0.14, 0x506070);
+superBladeG.add(superPoll);
+superAxeGroup.add(superBladeG);
+superAxeGroup.visible = false;
+rightArm.add(superAxeGroup);
+
+// Pickaxe — held in rightArm, does not chop trees
+const pickaxeGroup = new THREE.Group();
+pickaxeGroup.position.set(0.02, -0.69, 0);
+pickaxeGroup.rotation.x = Math.PI / 4;
+const pickHandle = cyl(0.026, 0.033, 0.54, 5, 0x5c3a1a);
+pickHandle.position.set(0, 0.27, 0);
+pickaxeGroup.add(pickHandle);
+const pickHeadG = new THREE.Group();
+pickHeadG.position.set(0, 0.56, 0);
+// Cross-bar
+const pickBar = box(0.08, 0.12, 0.08, 0x607080);
+pickHeadG.add(pickBar);
+// Long spike on one side
+const pickSpike = cyl(0.025, 0.055, 0.46, 5, 0x8090a0);
+pickSpike.rotation.z = Math.PI / 2;
+pickSpike.position.set(-0.26, 0, 0);
+pickHeadG.add(pickSpike);
+// Short blunt end on other side
+const pickBlunt = box(0.16, 0.09, 0.09, 0x7080a0);
+pickBlunt.position.set(0.13, 0, 0);
+pickHeadG.add(pickBlunt);
+pickaxeGroup.add(pickHeadG);
+pickaxeGroup.visible = false;
+rightArm.add(pickaxeGroup);
+
+// Legs — pivot at hip, 5-sided cylinders
+function makeLeg(side) {
+  const g = new THREE.Group();
+  g.position.set(side * 0.13, 0.76, 0);
+
+  const upper = cyl(0.09, 0.10, 0.38, 5, PANTS);
+  upper.position.y = -0.19;
+  g.add(upper);
+  pantsMeshes.push(upper);
+
+  const lower = cyl(0.07, 0.09, 0.36, 5, PANTS);
+  lower.position.y = -0.57;
+  g.add(lower);
+  pantsMeshes.push(lower);
+
+  // Foot — flat box
+  const foot = box(0.17, 0.09, 0.27, SHOES);
+  foot.position.set(0, -0.80, 0.06);
+  g.add(foot);
+  shoesMeshes.push(foot);
+
+  return g;
+}
+const leftLeg  = makeLeg(-1);
+const rightLeg = makeLeg( 1);
+char.add(leftLeg, rightLeg);
+
+char.position.y = 0.085;
+scene.add(char);
+
+// ── State ─────────────────────────────────────────────────────────────
+let camYaw    = 0;     // horizontal camera orbit angle
+let camPitch  = 0.28;  // vertical tilt (radians; + = looking up)
+let camMode   = 2;     // 1 = first-person, 2 = third-person
+let charFacing = 0;    // character's world-Y rotation
+let walkT     = 0;     // walk animation timer
+
+const MOVE_SPEED    = 4.5;   // m/s
+const SPRINT_SPEED  = 10.0;  // m/s while sprinting
+const CAM_ROT_SPEED = 1.8;   // rad/s
+const THIRD_DIST    = 5.5;   // camera distance behind character
+const GRAVITY       = -18;   // m/s²
+const JUMP_VEL      =  8;    // m/s initial upward velocity
+
+let velY       = 0;      // vertical velocity
+let onGround   = true;
+let stamina    = 1.0;    // 0–1
+let exhausted  = false;  // true until stamina recovers to threshold after depleting
+let isSprinting = false; // module-level so jump handler can read it
+const STAMINA_DRAIN    = 0.28;  // per second while sprinting
+const STAMINA_REFILL   = 0.09;  // per second while not sprinting
+const STAMINA_RECOVER  = 0.25;  // must reach this to sprint again after exhaustion
+
+const staminaBar      = document.getElementById('staminaBar');
+const hungerBar       = document.getElementById('hungerBar');
+const woodCountEl     = document.getElementById('woodCount');
+const coinCountEl     = document.getElementById('coinCount');
+const berryCountEl    = document.getElementById('berryCount');
+const inventoryEl     = document.getElementById('inventory');
+const treeHealthWrap  = document.getElementById('treeHealthWrap');
+const treeHealthBar   = document.getElementById('treeHealthBar');
+const hbBerriesEl     = document.getElementById('hb-berries');
+const hbBerryCount    = document.getElementById('hbBerryCount');
+
+// Dialog elements
+const dialogEl      = document.getElementById('dialog');
+const dialogNameEl  = document.getElementById('dialogName');
+const dialogTextEl  = document.getElementById('dialogText');
+const dialogCoinsEl = document.getElementById('dialogCoins');
+const dialogListEl  = document.getElementById('dialogList');
+const dialogHintEl  = document.getElementById('dialogHint');
+
+// ── Trees: collision + health + state ────────────────────────────────
+const trees = []; // {x, z, r, health, group, chopped, woodMesh}
+const obstacles = []; // {x, z, r} circular blockers
+const boxes     = []; // {minX, maxX, minZ, maxZ} AABB wall blockers
+const CHAR_R    = 0.35; // character collision radius
+
+// ── Hunger ────────────────────────────────────────────────────────────
+let hunger = 1.0;
+const HUNGER_DRAIN  = 0.0025; // ~6.5 min to empty
+const BERRY_RESTORE = 0.15;   // 15% per berry
+
+// ── Lumberjack NPC state ──────────────────────────────────────────────
+let coins        = 0;
+let berryCount   = 0;
+let hasMap       = false;
+let mapOpen      = false;
+let currentBiome = 'prairie';
+let hasSuperAxe  = false;
+let hasPickaxe   = false;
+let dialogState  = null; // null | 'greet' | 'trade' | 'thanks'
+let activeNpc    = null; // 'lumberjack' | 'trader'
+let tradeQty     = 1;
+let tradeItemIdx = 0;    // 0 = item A, 1 = item B
+let thanksMsg    = '';
+const LUMBERJACK_POS   = { x: 0, z: -13 };
+const LUMBERJACK_RANGE = 3.5;
+const TRADER_POS       = { x: 0, z: 13 };
+const TRADER_RANGE     = 5;
+const BYSTANDER_POS    = { x: 0.9, z: 15.85 };
+const BYSTANDER_RANGE  = 3;
+
+// ── Inventory ─────────────────────────────────────────────────────────
+let woodCount = 0;
+let inventoryOpen = false;
+let equipped = 'axe'; // 'axe' | 'wood'
+
+const hbAxeEl       = document.getElementById('hb-axe');
+const hbWoodEl      = document.getElementById('hb-wood');
+const hbWoodCount   = document.getElementById('hbWoodCount');
+const hbSuperAxeEl  = document.getElementById('hb-superaxe');
+const hbPickaxeEl   = document.getElementById('hb-pickaxe');
+const invSuperAxeEl = document.getElementById('inv-superaxe');
+const invPickaxeEl  = document.getElementById('inv-pickaxe');
+
+function setEquipped(item) {
+  if (item === 'wood'     && woodCount  === 0) return;
+  if (item === 'berries'  && berryCount === 0) return;
+  if (item === 'superaxe' && !hasSuperAxe)     return;
+  if (item === 'pickaxe'  && !hasPickaxe)      return;
+  equipped = item;
+  hbAxeEl.classList.toggle('active',      equipped === 'axe');
+  hbWoodEl.classList.toggle('active',     equipped === 'wood');
+  hbBerriesEl.classList.toggle('active',  equipped === 'berries');
+  hbSuperAxeEl.classList.toggle('active', equipped === 'superaxe');
+  hbPickaxeEl.classList.toggle('active',  equipped === 'pickaxe');
+}
+
+// ── Dialog / conversation ─────────────────────────────────────────────
+function openDialog(state) {
+  dialogState = state;
+  updateDialog();
+  dialogEl.style.display = 'block';
+  // Close inventory if open
+  inventoryOpen = false;
+  inventoryEl.style.display = 'none';
+}
+function closeDialog() {
+  dialogState = null;
+  dialogEl.style.display = 'none';
+}
+function updateDialog() {
+  dialogCoinsEl.style.display = 'none';
+  dialogListEl.innerHTML = '';
+  if (activeNpc === 'lumberjack') {
+    if (dialogState === 'greet') {
+      dialogNameEl.textContent = 'Lumberjack';
+      dialogTextEl.textContent =
+        '"Hey there, little feller! Want to sell me some lumber for some other things? ' +
+        'Me myself is too old to be choppin\' down trees."';
+      dialogHintEl.textContent = '[E] Trade   [Q] Close';
+    } else if (dialogState === 'trade') {
+      dialogNameEl.textContent = 'Lumberjack — Trade';
+      dialogTextEl.textContent = '"What are ya sellin\'... or buyin\'?"';
+      dialogCoinsEl.style.display = 'block';
+      if (tradeItemIdx < 2) tradeQty = Math.max(1, Math.min(tradeQty, Math.max(1, woodCount)));
+      dialogCoinsEl.textContent =
+        `Wood: ${woodCount}  ·  Coins: ${coins}  ·  Berries: ${berryCount}`;
+      [
+        (qty) => `Sell Wood ×${qty}  →  +${qty * 2} coins`,
+        (qty) => `Buy Berries ×${qty}  →  -${qty} wood`,
+        ()    => hasSuperAxe ? 'Super Axe  (OWNED)' : 'Buy Super Axe  →  -50 coins',
+      ].forEach((fn, i) => {
+        const row = document.createElement('div');
+        row.className = 'dlg-item' + (i === tradeItemIdx ? ' sel' : '');
+        const qty = (i === tradeItemIdx && i < 2) ? tradeQty : 1;
+        row.textContent = (i === tradeItemIdx ? '▸  ' : '    ') + fn(qty);
+        if (i === 0 && woodCount === 0) row.style.opacity = '0.4';
+        if (i === 2 && (hasSuperAxe || coins < 50)) row.style.opacity = '0.4';
+        dialogListEl.appendChild(row);
+      });
+      dialogHintEl.textContent = '[↑↓] Select   [←→] Amount   [E] Trade   [Q] Back';
+    } else if (dialogState === 'confirmAxe') {
+      dialogNameEl.textContent = 'Lumberjack';
+      dialogTextEl.textContent = '"Oh, you really want this? Well, it\'ll be 50 coins for ya then."';
+      dialogCoinsEl.style.display = 'block';
+      dialogCoinsEl.textContent = `Your coins: ${coins}`;
+      dialogHintEl.textContent = '[E] Confirm   [Q] Back';
+    } else if (dialogState === 'thanks') {
+      dialogNameEl.textContent = 'Lumberjack';
+      dialogTextEl.textContent = thanksMsg;
+      dialogHintEl.textContent = '[Q] Close';
+    }
+  } else if (activeNpc === 'trader') {
+    if (dialogState === 'greet') {
+      dialogNameEl.textContent = 'Trader';
+      dialogTextEl.textContent = '"Welcome, traveler! Care to browse me wares?"';
+      dialogHintEl.textContent = '[E] Browse   [Q] Close';
+    } else if (dialogState === 'trade') {
+      dialogNameEl.textContent = 'Trader — Wares';
+      dialogTextEl.textContent = '"What will it be?"';
+      dialogCoinsEl.style.display = 'block';
+      dialogCoinsEl.textContent =
+        `Coins: ${coins}  ·  Wood: ${woodCount}  ·  Berries: ${berryCount}`;
+      const PRICES = [3, 2]; // wood costs 3 coins, berries cost 2 coins each
+      [
+        (qty) => `Buy Wood ×${qty}  →  -${qty * 3} coins`,
+        (qty) => `Buy Berries ×${qty}  →  -${qty * 2} coins`,
+        ()    => hasPickaxe ? 'Pickaxe  (OWNED)' : 'Buy Pickaxe  →  -25 coins',
+      ].forEach((fn, i) => {
+        const row = document.createElement('div');
+        row.className = 'dlg-item' + (i === tradeItemIdx ? ' sel' : '');
+        const qty = (i === tradeItemIdx && i < 2) ? tradeQty : 1;
+        row.textContent = (i === tradeItemIdx ? '▸  ' : '    ') + fn(qty);
+        if (i < 2 && coins < PRICES[i]) row.style.opacity = '0.4';
+        if (i === 2 && (hasPickaxe || coins < 25)) row.style.opacity = '0.4';
+        dialogListEl.appendChild(row);
+      });
+      dialogHintEl.textContent = '[↑↓] Select   [←→] Amount   [E] Buy   [Q] Back';
+    } else if (dialogState === 'thanks') {
+      dialogNameEl.textContent = 'Trader';
+      dialogTextEl.textContent = thanksMsg;
+      dialogHintEl.textContent = '[Q] Close';
+    }
+  } else if (activeNpc === 'bystander') {
+    if (dialogState === 'greet') {
+      dialogNameEl.textContent = 'Stranger';
+      if (hasMap) {
+        dialogTextEl.textContent = '"Oh, you already got my map. Hope it helps!"';
+        dialogHintEl.textContent = '[Q] Close';
+      } else {
+        dialogTextEl.textContent = '"Hi. I\'m pretty hungry. Care to sell me some berries for this map I found?"';
+        dialogHintEl.textContent = berryCount > 0
+          ? '[E] Give 1 Berry → Get Map   [Q] Close'
+          : '[Q] Close  (need berries)';
+      }
+    } else if (dialogState === 'thanks') {
+      dialogNameEl.textContent = 'Stranger';
+      dialogTextEl.textContent = '"Thanks! That\'ll fill me right up. Check your map with [M]."';
+      dialogHintEl.textContent = '[Q] Close';
+    }
+  }
+}
+
+// ── Chop state ────────────────────────────────────────────────────────
+const CHOP_RANGE  = 3.5;
+const CHOP_DAMAGE = 20;
+let chopCooldown = 0;   // seconds until next chop allowed
+let chopAnim     = 0;   // seconds remaining in chop swing animation
+
+// ── Input ─────────────────────────────────────────────────────────────
+const keys = new Set();
+window.addEventListener('keydown', e => {
+  keys.add(e.key.toLowerCase());
+
+  // ── Dialog navigation (priority — consumes keys) ──
+  if (dialogState) {
+    e.preventDefault();
+    if (e.key === 'q' || e.key === 'Q') {
+      if (dialogState === 'confirmAxe') { openDialog('trade'); return; }
+      if (dialogState === 'trade') { openDialog('greet'); return; }
+      closeDialog(); return;
+    }
+    if (dialogState === 'greet' && (e.key === 'e' || e.key === 'E')) {
+      if (activeNpc === 'bystander') {
+        if (!hasMap && berryCount > 0) {
+          berryCount--;
+          berryCountEl.textContent = berryCount;
+          hbBerryCount.textContent = berryCount;
+          if (berryCount === 0 && equipped === 'berries') setEquipped('axe');
+          hasMap = true;
+          openDialog('thanks');
+        }
+      } else {
+        tradeQty = 1; tradeItemIdx = 0; openDialog('trade');
+      }
+      return;
+    }
+    if (dialogState === 'trade') {
+      // ↑↓ select item
+      if (e.key === 'ArrowUp')   { tradeItemIdx = Math.max(0, tradeItemIdx - 1); tradeQty = 1; updateDialog(); return; }
+      if (e.key === 'ArrowDown') { tradeItemIdx = Math.min(2, tradeItemIdx + 1); tradeQty = 1; updateDialog(); return; }
+      // ←→ adjust quantity (no qty for item 2 — it's always a single purchase)
+      if (e.key === 'ArrowRight') {
+        if (tradeItemIdx < 2) {
+          if (activeNpc === 'lumberjack') {
+            tradeQty = Math.min(Math.max(1, woodCount), tradeQty + 1);
+          } else {
+            const price = tradeItemIdx === 0 ? 3 : 2;
+            tradeQty = Math.min(Math.max(1, Math.floor(coins / price)), tradeQty + 1);
+          }
+        }
+        updateDialog(); return;
+      }
+      if (e.key === 'ArrowLeft') { if (tradeItemIdx < 2) tradeQty = Math.max(1, tradeQty - 1); updateDialog(); return; }
+      if (e.key === 'e' || e.key === 'E') {
+        if (dialogState === 'confirmAxe') {
+          if (coins >= 50) {
+            coins -= 50; coinCountEl.textContent = coins;
+            hasSuperAxe = true;
+            hbSuperAxeEl.style.display = 'flex';
+            invSuperAxeEl.style.display = '';
+            thanksMsg = '"Okay, then... here ya go."';
+          } else {
+            thanksMsg = '"Haha, you can\'t have my pickaxe!"';
+          }
+          openDialog('thanks'); return;
+        }
+        if (activeNpc === 'lumberjack') {
+          if (tradeItemIdx === 2) {
+            if (!hasSuperAxe) openDialog('confirmAxe');
+          } else if (woodCount >= tradeQty && tradeQty > 0) {
+            woodCount -= tradeQty;
+            woodCountEl.textContent = woodCount;
+            hbWoodCount.textContent = woodCount;
+            if (tradeItemIdx === 0) {
+              coins += tradeQty * 2;
+              coinCountEl.textContent = coins;
+              thanksMsg = '"Thanks for the wood, kid!"';
+            } else {
+              berryCount += tradeQty;
+              berryCountEl.textContent = berryCount;
+              hbBerryCount.textContent = berryCount;
+              thanksMsg = '"Here\'s your berries! Fresh-picked this mornin\'!"';
+            }
+            if (woodCount === 0 && equipped === 'wood') setEquipped('axe');
+            openDialog('thanks');
+          }
+        } else { // trader
+          if (tradeItemIdx === 2) {
+            // Buy pickaxe
+            if (!hasPickaxe && coins >= 25) {
+              coins -= 25; coinCountEl.textContent = coins;
+              hasPickaxe = true;
+              hbPickaxeEl.style.display = 'flex';
+              invPickaxeEl.style.display = '';
+              thanksMsg = '"A fine tool, that one!"';
+              openDialog('thanks');
+            }
+          } else {
+            const price = tradeItemIdx === 0 ? 3 : 2;
+            const total = tradeQty * price;
+            if (coins >= total && tradeQty > 0) {
+              coins -= total;
+              coinCountEl.textContent = coins;
+              if (tradeItemIdx === 0) {
+                woodCount += tradeQty;
+                woodCountEl.textContent = woodCount;
+                hbWoodCount.textContent = woodCount;
+              } else {
+                berryCount += tradeQty;
+                berryCountEl.textContent = berryCount;
+                hbBerryCount.textContent = berryCount;
+              }
+              thanksMsg = '"Hey. Wanna know how to get around in this place? Well, there\'s a dude out back that can help you out."';
+              openDialog('thanks');
+            }
+          }
+        }
+        return;
+      }
+    }
+    return; // block all other keys while dialog is open
+  }
+
+  if (e.key === 'm' || e.key === 'M') {
+    if (!hasMap) return;
+    mapOpen = !mapOpen;
+    const mapEl = document.getElementById('mapScreen');
+    if (mapOpen) { drawMap(); mapEl.style.display = 'flex'; }
+    else          { mapEl.style.display = 'none'; }
+    return;
+  }
+  if (e.key === '1') { camMode = 1; document.getElementById('modeTag').textContent = '1ST PERSON'; }
+  if (e.key === '2') { camMode = 2; document.getElementById('modeTag').textContent = '3RD PERSON'; }
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  if (e.key === ' ' && onGround) { velY = JUMP_VEL * (isSprinting ? 1.4 : 1); onGround = false; }
+
+  // ── Equip slots ──
+  if (e.key === '3') setEquipped('axe');
+  if (e.key === '4') setEquipped('wood');
+  if (e.key === '5') setEquipped('berries');
+  if (e.key === '6') setEquipped('superaxe');
+  if (e.key === '7') setEquipped('pickaxe');
+
+  // ── Eat berry (E) — only when berries are equipped ──
+  if (e.key === 'e' || e.key === 'E') {
+    if (equipped === 'berries' && berryCount > 0) {
+      berryCount--;
+      hunger = Math.min(1.0, hunger + BERRY_RESTORE);
+      berryCountEl.textContent = berryCount;
+      hbBerryCount.textContent = berryCount;
+      if (berryCount === 0 && equipped === 'berries') setEquipped('axe');
+    }
+  }
+
+  // ── Chop tree / pick up wood (C) ──
+  if (e.key === 'c' || e.key === 'C') {
+    // Lumberjack interaction (priority)
+    const ldx = char.position.x - LUMBERJACK_POS.x;
+    const ldz = char.position.z - LUMBERJACK_POS.z;
+    if (Math.sqrt(ldx*ldx + ldz*ldz) < LUMBERJACK_RANGE) {
+      activeNpc = 'lumberjack'; tradeQty = 1; openDialog('greet'); return;
+    }
+    // Trader interaction
+    const tdx = char.position.x - TRADER_POS.x;
+    const tdz = char.position.z - TRADER_POS.z;
+    if (Math.sqrt(tdx*tdx + tdz*tdz) < TRADER_RANGE && char.position.z < TRADER_POS.z) {
+      activeNpc = 'trader'; tradeQty = 1; openDialog('greet'); return;
+    }
+    // Bystander interaction
+    const bdx = char.position.x - BYSTANDER_POS.x;
+    const bdz = char.position.z - BYSTANDER_POS.z;
+    if (Math.sqrt(bdx*bdx + bdz*bdz) < BYSTANDER_RANGE) {
+      activeNpc = 'bystander'; openDialog('greet'); return;
+    }
+    // Always try to pick up nearby wood
+    for (const t of trees) {
+      if (!t.woodMesh) continue;
+      const dx = char.position.x - t.x, dz = char.position.z - t.z;
+      if (Math.sqrt(dx*dx + dz*dz) < 2.5) {
+        scene.remove(t.woodMesh);
+        t.woodMesh = null;
+        woodCount += t.isBig ? 8 : 3;
+        woodCountEl.textContent = woodCount;
+        hbWoodCount.textContent = woodCount;
+        break;
+      }
+    }
+    // Chop only if axe or super axe is equipped (pickaxe cannot chop)
+    const isAxe = equipped === 'axe' || equipped === 'superaxe';
+    if (isAxe && chopCooldown <= 0) {
+      const chopDmg = equipped === 'superaxe' ? 100 : CHOP_DAMAGE;
+      let nearest = null, nearestDist = Infinity;
+      for (const t of trees) {
+        if (t.chopped) continue;
+        if (t.isBig && equipped !== 'superaxe') continue; // regular axe can't cut big tree
+        const dx = char.position.x - t.x, dz = char.position.z - t.z;
+        const d = Math.sqrt(dx*dx + dz*dz);
+        if (d < CHOP_RANGE && d < nearestDist) { nearest = t; nearestDist = d; }
+      }
+      if (nearest) {
+        nearest.health -= chopDmg;
+        chopCooldown = 0.45;
+        chopAnim = 0.3;
+        if (nearest.health <= 0) {
+          nearest.health = 0;
+          nearest.chopped = true;
+          nearest.choppedAt = Date.now();
+          nearest.group.visible = false;
+          const stumpR = nearest.isBig ? 0.55 : 0.22;
+          const stumpH = nearest.isBig ? 0.60 : 0.28;
+          const stump = new THREE.Mesh(new THREE.CylinderGeometry(stumpR * 0.85, stumpR, stumpH, 7), mat(0x7a5230));
+          stump.position.set(nearest.x, 0.085 + stumpH * 0.5, nearest.z);
+          scene.add(stump);
+          nearest.stump = stump;
+          nearest.woodMesh = makeWoodPile(nearest.x, nearest.z);
+        }
+      }
+    }
+  }
+
+  // ── Inventory toggle (Q) ──
+  if (e.key === 'q' || e.key === 'Q') {
+    inventoryOpen = !inventoryOpen;
+    inventoryEl.style.display = inventoryOpen ? 'block' : 'none';
+  }
+});
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Animation loop ────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // ─ Camera rotation via arrow keys ─
+  if (!dialogState) {
+  const lrDir = 1;
+  const udDir = (camMode === 1) ? -1 : 1;
+  const camSpeed = CAM_ROT_SPEED * (isSprinting ? 1.8 : 1);
+  if (keys.has('arrowleft'))  camYaw   += lrDir * camSpeed * dt;
+  if (keys.has('arrowright')) camYaw   -= lrDir * camSpeed * dt;
+  if (keys.has('arrowup'))    camPitch  = Math.max(-0.28,           camPitch - udDir * camSpeed * dt);
+  if (keys.has('arrowdown'))  camPitch  = Math.min( Math.PI * 0.44, camPitch + udDir * camSpeed * dt);
+  } // end !dialogState (camera)
+
+  // ─ WASD movement relative to camera direction ─
+  // Forward vector (horizontal plane only)
+  const fwd   = new THREE.Vector3( Math.sin(camYaw), 0,  Math.cos(camYaw));
+  const right  = new THREE.Vector3(-Math.cos(camYaw), 0,  Math.sin(camYaw));
+
+  const moveVec = new THREE.Vector3();
+  if (keys.has('w')) moveVec.addScaledVector(fwd,   1);
+  if (keys.has('s')) moveVec.addScaledVector(fwd,  -1);
+  if (keys.has('d')) moveVec.addScaledVector(right,  1);
+  if (keys.has('a')) moveVec.addScaledVector(right, -1);
+
+  const moving = !dialogState && moveVec.lengthSq() > 0.001;
+
+  // ─ Sprint stamina ─
+  const wantSprint = keys.has('shift') && moving;
+  if (wantSprint && stamina > 0 && !exhausted) {
+    stamina = Math.max(0, stamina - STAMINA_DRAIN * dt);
+    if (stamina === 0) exhausted = true;
+  } else {
+    stamina = Math.min(1, stamina + STAMINA_REFILL * dt);
+    if (exhausted && stamina >= STAMINA_RECOVER) exhausted = false;
+  }
+  isSprinting = wantSprint && stamina > 0 && !exhausted;
+  const speed = isSprinting ? SPRINT_SPEED : MOVE_SPEED;
+
+  // ─ Stamina bar UI ─
+  staminaBar.style.width = (stamina * 100) + '%';
+  staminaBar.style.background = stamina < 0.25
+    ? 'linear-gradient(90deg,#e74c3c,#c0392b)'
+    : stamina < 0.55
+      ? 'linear-gradient(90deg,#f39c12,#e67e22)'
+      : 'linear-gradient(90deg,#2ecc71,#27ae60)';
+
+  if (moving) {
+    moveVec.normalize();
+    char.position.addScaledVector(moveVec, speed * dt);
+
+    // Smooth-rotate character to face movement direction
+    const targetFacing = Math.atan2(moveVec.x, moveVec.z);
+    let diff = targetFacing - charFacing;
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    charFacing += diff * Math.min(1, 14 * dt);
+
+    // Walk/run animation — faster cadence when sprinting
+    const animSpeed = isSprinting ? 14 : 7;
+    walkT += dt * animSpeed;
+    const swingAmt = isSprinting ? 0.75 : 0.55;
+    const sw = Math.sin(walkT) * swingAmt;
+    leftLeg.rotation.x  =  sw;
+    rightLeg.rotation.x = -sw;
+    leftArm.rotation.x  = -sw * (isSprinting ? 0.65 : 0.45);
+    rightArm.rotation.x =  sw * (isSprinting ? 0.65 : 0.45);
+  } else {
+    // Ease limbs back to idle
+    leftLeg.rotation.x  *= 0.82;
+    rightLeg.rotation.x *= 0.82;
+    leftArm.rotation.x  *= 0.82;
+    rightArm.rotation.x *= 0.82;
+  }
+
+  // ─ Chop animation ─
+  if (chopCooldown > 0) chopCooldown -= dt;
+  if (chopAnim > 0) {
+    chopAnim -= dt;
+    rightArm.rotation.x = -Math.PI * 0.7 * (chopAnim / 0.3);
+  }
+
+  // ─ Hunger drain ─
+  hunger = Math.max(0, hunger - HUNGER_DRAIN * dt);
+  hungerBar.style.width = (hunger * 100) + '%';
+  hungerBar.style.background = hunger < 0.25
+    ? 'linear-gradient(90deg,#c0392b,#e74c3c)'
+    : hunger < 0.55
+      ? 'linear-gradient(90deg,#d35400,#e67e22)'
+      : 'linear-gradient(90deg,#d4a012,#f0c060)';
+
+  // ─ Held item visibility ─
+  if (equipped === 'wood'    && woodCount  === 0) setEquipped('axe'); // auto-unequip
+  if (equipped === 'berries' && berryCount === 0) setEquipped('axe');
+  axeGroup.visible      = (equipped === 'axe');
+  logInHand.visible     = (equipped === 'wood'     && woodCount  > 0);
+  berryInHand.visible   = (equipped === 'berries'  && berryCount > 0);
+  superAxeGroup.visible = (equipped === 'superaxe' && hasSuperAxe);
+  pickaxeGroup.visible  = (equipped === 'pickaxe'  && hasPickaxe);
+
+  // ─ Jump / gravity ─
+  velY += GRAVITY * dt;
+  char.position.y += velY * dt;
+  // foot bottom sits 0.085 below char origin — use that as ground floor
+  if (char.position.y <= 0.085) {
+    char.position.y = 0.085;
+    velY = 0;
+    onGround = true;
+  }
+
+  // ─ Tree regrowth (1 minute after chop) ─
+  for (const t of trees) {
+    if (t.chopped && !t.isBig && Date.now() - t.choppedAt >= 60000) {
+      t.chopped = false;
+      t.health = 100;
+      t.group.visible = true;
+      if (t.stump)   { scene.remove(t.stump);   t.stump = null; }
+      if (t.woodMesh){ scene.remove(t.woodMesh); t.woodMesh = null; }
+      t.choppedAt = null;
+    }
+  }
+
+  // ─ Tree collision + nearby health display ─
+  let nearbyTree = null, nearbyDist = Infinity;
+  for (const t of trees) {
+    const dx = char.position.x - t.x;
+    const dz = char.position.z - t.z;
+    const distSq = dx * dx + dz * dz;
+    if (!t.chopped && distSq < t.r * t.r && distSq > 0.0001) {
+      const dist = Math.sqrt(distSq);
+      char.position.x = t.x + (dx / dist) * t.r;
+      char.position.z = t.z + (dz / dist) * t.r;
+    }
+    const d = Math.sqrt(distSq);
+    if (!t.chopped && d < CHOP_RANGE && d < nearbyDist) { nearbyTree = t; nearbyDist = d; }
+  }
+  // ─ Circular structure collision ─
+  for (const o of obstacles) {
+    const dx = char.position.x - o.x, dz = char.position.z - o.z;
+    const distSq = dx*dx + dz*dz;
+    if (distSq < o.r * o.r && distSq > 0.0001) {
+      const dist = Math.sqrt(distSq);
+      char.position.x = o.x + (dx / dist) * o.r;
+      char.position.z = o.z + (dz / dist) * o.r;
+    }
+  }
+  // ─ AABB wall collision ─
+  for (const b of boxes) {
+    const px = char.position.x, pz = char.position.z;
+    const eMinX = b.minX - CHAR_R, eMaxX = b.maxX + CHAR_R;
+    const eMinZ = b.minZ - CHAR_R, eMaxZ = b.maxZ + CHAR_R;
+    if (px > eMinX && px < eMaxX && pz > eMinZ && pz < eMaxZ) {
+      const dLeft  = px - eMinX, dRight = eMaxX - px;
+      const dBack  = pz - eMinZ, dFront = eMaxZ - pz;
+      const m = Math.min(dLeft, dRight, dBack, dFront);
+      if      (m === dLeft)  char.position.x = eMinX;
+      else if (m === dRight) char.position.x = eMaxX;
+      else if (m === dBack)  char.position.z = eMinZ;
+      else                   char.position.z = eMaxZ;
+    }
+  }
+
+  if (nearbyTree && nearbyTree.health < 100) {
+    treeHealthWrap.style.display = 'block';
+    treeHealthBar.style.width = nearbyTree.health + '%';
+    treeHealthBar.style.background = nearbyTree.health > 60
+      ? 'linear-gradient(90deg,#27ae60,#2ecc71)'
+      : nearbyTree.health > 30
+        ? 'linear-gradient(90deg,#f39c12,#e67e22)'
+        : 'linear-gradient(90deg,#e74c3c,#c0392b)';
+  } else {
+    treeHealthWrap.style.display = 'none';
+  }
+
+  char.rotation.y = charFacing;
+
+  // Keep directional light tracking character
+  sun.position.set(char.position.x + 80, 120, char.position.z + 60);
+  sun.target.position.copy(char.position);
+  sun.target.updateMatrixWorld();
+
+  // ─ Camera placement ─
+  if (camMode === 1) {
+    // First-person: hide character, put camera at head
+    char.visible = false;
+    const headWorld = new THREE.Vector3();
+    headGroup.getWorldPosition(headWorld);
+    headWorld.y += 0.04;
+    camera.position.copy(headWorld);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = camYaw + Math.PI;
+    camera.rotation.x = camPitch;
+    camera.rotation.z = 0;
+  } else {
+    // Third-person: orbit camera around character
+    char.visible = true;
+    const hDist = THIRD_DIST * Math.cos(camPitch);
+    const offset = new THREE.Vector3(
+      -Math.sin(camYaw) * hDist,
+       Math.sin(camPitch) * THIRD_DIST + 1.2,
+      -Math.cos(camYaw) * hDist
+    );
+    camera.position.copy(char.position).add(offset);
+    camera.position.y = Math.max(0.3, camera.position.y);
+
+    const lookAt = char.position.clone();
+    lookAt.y += 1.0;
+    camera.lookAt(lookAt);
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ── Wood pile mesh ────────────────────────────────────────────────────
+function makeWoodPile(x, z) {
+  const g = new THREE.Group();
+  const logColors = [0x8b6340, 0x7a5230, 0x9a7050];
+  // Bottom row of 3 logs
+  for (let i = 0; i < 3; i++) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.62, 6), mat(logColors[i % logColors.length]));
+    log.rotation.z = Math.PI / 2;
+    log.position.set((i - 1) * 0.24, 0.10, 0);
+    g.add(log);
+  }
+  // Top row of 2 logs
+  for (let i = 0; i < 2; i++) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.62, 6), mat(logColors[i]));
+    log.rotation.z = Math.PI / 2;
+    log.position.set((i - 0.5) * 0.24, 0.28, 0);
+    g.add(log);
+  }
+  // "Pick up" glow ring on ground
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 4, 16), mat(0xf0c060));
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.02;
+  g.add(ring);
+  g.position.set(x, 0.085, z);
+  scene.add(g);
+  return g;
+}
+
+// ── Biome generation ─────────────────────────────────────────────────
+function placeObjects(count, minR, maxR, skipR, fn) {
+  let placed = 0, tries = 0;
+  while (placed < count && tries < count * 8) {
+    tries++;
+    const angle = Math.random() * Math.PI * 2;
+    const r = minR + Math.random() * (maxR - minR);
+    const x = Math.cos(angle) * r, z = Math.sin(angle) * r;
+    if (Math.sqrt(x*x + z*z) < skipR) continue;
+    fn(x, z);
+    placed++;
+  }
+}
+
+function makeAcacia(x, z) {
+  const g = new THREE.Group();
+  const h = 4.5 + Math.random() * 2.5;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.30, h, 5), mat(0x7a5230));
+  trunk.position.y = h / 2; trunk.castShadow = true;
+  g.add(trunk);
+  const spread = 2.4 + Math.random() * 1.6;
+  const canopy = new THREE.Mesh(new THREE.CylinderGeometry(spread, spread * 0.25, 0.7, 7), mat(0x8b7040));
+  canopy.position.y = h + 0.3; canopy.castShadow = true; g.add(canopy);
+  const canopy2 = new THREE.Mesh(new THREE.CylinderGeometry(spread * 0.6, spread * 0.08, 0.5, 7), mat(0x7a6035));
+  canopy2.position.y = h + 0.9; g.add(canopy2);
+  g.position.set(x, 0.085, z);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(g);
+  trees.push({ x, z, r: 0.55, health: 100, group: g, chopped: false, woodMesh: null });
+}
+
+function makeGrassTuft(x, z, color) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.38 + Math.random() * 0.28, 3), mat(color));
+    blade.position.set((Math.random()-0.5)*0.18, 0.19, (Math.random()-0.5)*0.18);
+    blade.rotation.z = (Math.random()-0.5)*0.35;
+    blade.castShadow = true; g.add(blade);
+  }
+  g.position.set(x, 0.085, z);
+  scene.add(g);
+}
+
+function makePine(x, z) {
+  const g = new THREE.Group();
+  const h = 3.5 + Math.random() * 2.5;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, h, 5), mat(0x5c3a1a));
+  trunk.position.y = h / 2; trunk.castShadow = true; g.add(trunk);
+  const leafColors = [0x2d5a27, 0x3a7030, 0x255220];
+  for (let i = 0; i < 3; i++) {
+    const r = 2.0 - i * 0.40;
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(r, 2.2, 6),
+      mat(leafColors[i % leafColors.length]));
+    cone.position.y = h + 0.5 + i * 1.4; cone.castShadow = true; g.add(cone);
+  }
+  g.position.set(x, 0.085, z);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(g);
+  trees.push({ x, z, r: 0.53, health: 100, group: g, chopped: false, woodMesh: null });
+}
+
+function makeEvergreenSnow(x, z) {
+  const g = new THREE.Group();
+  const h = 4.0 + Math.random() * 3.0;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.26, h, 6), mat(0x4a2e10));
+  trunk.position.y = h / 2; trunk.castShadow = true; g.add(trunk);
+  const layers = 4;
+  const leafColor = 0x1e4d22;
+  const snowColor = 0xddeeff;
+  for (let i = 0; i < layers; i++) {
+    const t = i / (layers - 1);
+    const baseR = 2.2 - i * 0.38;
+    const layerY = h + 0.4 + i * 1.3;
+    // Green cone layer
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(baseR, 2.0, 7), mat(leafColor));
+    cone.position.y = layerY; cone.castShadow = true; g.add(cone);
+    // Snow cap on top of each layer — smaller flat cone
+    const snowCap = new THREE.Mesh(new THREE.ConeGeometry(baseR * 0.72, 0.55, 7), mat(snowColor));
+    snowCap.position.y = layerY + 0.85; snowCap.castShadow = true; g.add(snowCap);
+  }
+  g.position.set(x, 0.085, z);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(g);
+  trees.push({ x, z, r: 0.53, health: 100, group: g, chopped: false, woodMesh: null });
+}
+
+function makeSnowPatch(x, z) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 5; i++) {
+    const r = 0.15 + Math.random() * 0.25;
+    const mound = new THREE.Mesh(new THREE.SphereGeometry(r, 5, 3), mat(0xeef6ff));
+    mound.scale.y = 0.35;
+    mound.position.set((Math.random()-0.5)*0.6, r*0.35, (Math.random()-0.5)*0.6);
+    g.add(mound);
+  }
+  g.position.set(x, 0.085, z);
+  scene.add(g);
+}
+
+function makeFlower(x, z) {
+  const palette = [0xff4757, 0xffa502, 0xff6b81, 0xeccc68, 0xa29bfe, 0x74b9ff, 0xff7f50];
+  const color = palette[Math.floor(Math.random() * palette.length)];
+  const g = new THREE.Group();
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.28, 4), mat(0x44a044));
+  stem.position.y = 0.14; g.add(stem);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4), mat(color));
+  head.position.y = 0.31; head.castShadow = true; g.add(head);
+  // Petals ring
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const petal = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), mat(color));
+    petal.position.set(Math.cos(a)*0.1, 0.29, Math.sin(a)*0.1); g.add(petal);
+  }
+  g.position.set(x, 0.085, z);
+  scene.add(g);
+}
+
+function makePrairieGrass(x, z) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.22 + Math.random() * 0.12, 3), mat(0x5aab3a));
+    blade.position.set((Math.random()-0.5)*0.12, 0.12, (Math.random()-0.5)*0.12);
+    blade.rotation.z = (Math.random()-0.5)*0.25; g.add(blade);
+  }
+  g.position.set(x, 0.085, z);
+  scene.add(g);
+}
+
+// ── Big Tree (next to lumberjack) ────────────────────────────────────
+function makeBigTree(x, z, biome) {
+  const g = new THREE.Group();
+  const h = 15 + Math.random() * 4;
+  const trunkCol = biome === 'savanna' ? 0x7a5230 : 0x4a2e10;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.84, h, 7), mat(trunkCol));
+  trunk.position.y = h / 2; trunk.castShadow = true; g.add(trunk);
+
+  if (biome === 'savanna') {
+    const spread = 7.5 + Math.random();
+    const c1 = new THREE.Mesh(new THREE.CylinderGeometry(spread, spread * 0.12, 1.5, 8), mat(0x8b7040));
+    c1.position.y = h + 0.7; c1.castShadow = true; g.add(c1);
+    const c2 = new THREE.Mesh(new THREE.CylinderGeometry(spread * 0.48, spread * 0.04, 1.0, 8), mat(0x7a6035));
+    c2.position.y = h + 1.9; g.add(c2);
+  } else {
+    const leafCol = biome === 'ice' ? 0x1e4d22 : 0x2d5a27;
+    for (let i = 0; i < 5; i++) {
+      const r = 5.2 - i * 0.68;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r, 4.0, 7), mat(leafCol));
+      cone.position.y = h + 1.8 + i * 2.7; cone.castShadow = true; g.add(cone);
+      if (biome === 'ice') {
+        const sc = new THREE.Mesh(new THREE.ConeGeometry(r * 0.66, 1.3, 7), mat(0xddeeff));
+        sc.position.y = h + 1.8 + i * 2.7 + 1.9; g.add(sc);
+      }
+    }
+  }
+
+  g.position.set(x, 0.085, z);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(g);
+  // Big tree uses trees[] for health/chop; r=1.3 handles its own collision in the tree loop
+  trees.push({ x, z, r: 1.3, health: 300, group: g, chopped: false,
+               woodMesh: null, stump: null, choppedAt: null, isBig: true });
+}
+
+// ── Lumberjack NPC ────────────────────────────────────────────────────
+function makeLumberjack(biome) {
+  const FLANNEL = 0xb83020;  // red flannel shirt
+  const DENIM   = 0x2a4060;  // dark blue overalls
+  const BOOT_C  = 0x3a1e08;  // dark brown boots
+  const BEARD_C = 0x3a2005;  // dark brown beard
+  const LJ_SKIN = 0xecaa78;  // weathered skin
+  const HAT_C   = 0x221400;  // dark hat
+
+  const g = new THREE.Group();
+
+  // ── Torso (wide and stocky) ──
+  const torso = box(0.66, 0.76, 0.34, FLANNEL);
+  torso.position.y = 1.14;
+  g.add(torso);
+
+  // Suspender straps over flannel
+  [-0.17, 0.17].forEach(sx => {
+    const strap = box(0.09, 0.76, 0.36, DENIM);
+    strap.position.set(sx, 1.14, 0);
+    g.add(strap);
+  });
+
+  // ── Head group ──
+  const headG = new THREE.Group();
+  headG.position.y = 1.80;
+  const headMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.24, 0), mat(LJ_SKIN));
+  headMesh.castShadow = true;
+  headG.add(headMesh);
+
+  // Eyes
+  [-0.09, 0.09].forEach(ex => {
+    const eye = box(0.076, 0.054, 0.025, 0x111111);
+    eye.position.set(ex, 0.06, 0.22);
+    headG.add(eye);
+  });
+  // Thick eyebrows
+  [-0.09, 0.09].forEach(ex => {
+    const brow = box(0.096, 0.034, 0.022, BEARD_C);
+    brow.position.set(ex, 0.14, 0.224);
+    headG.add(brow);
+  });
+  // Bushy beard (three overlapping boxes for volume)
+  const brd1 = box(0.42, 0.28, 0.22, BEARD_C); // main bulk
+  brd1.position.set(0, -0.13, 0.13);
+  headG.add(brd1);
+  const brd2 = box(0.32, 0.18, 0.18, BEARD_C); // lower chin
+  brd2.position.set(0, -0.29, 0.11);
+  headG.add(brd2);
+  const mustache = box(0.22, 0.085, 0.19, BEARD_C);
+  mustache.position.set(0, -0.01, 0.22);
+  headG.add(mustache);
+
+  // Wide-brim lumberjack hat — dome tall enough to clear the dodecahedron top
+  // Head radius=0.24, top at y=+0.24 from headG center (world y≈2.04)
+  const hatDome = cyl(0.14, 0.30, 0.34, 7, HAT_C);
+  hatDome.position.y = 0.43; // dome from y=0.26 to y=0.60 — head top ≈0.24 → fully covered ✓
+  headG.add(hatDome);
+  const hatBrim = box(0.80, 0.072, 0.80, HAT_C);
+  hatBrim.position.y = 0.27;
+  headG.add(hatBrim);
+
+  g.add(headG);
+
+  // Neck
+  const neck = cyl(0.085, 0.10, 0.13, 5, LJ_SKIN);
+  neck.position.y = 1.57;
+  g.add(neck);
+
+  // ── Arms (thick, slightly angled out) ──
+  [-1, 1].forEach(side => {
+    const upper = cyl(0.095, 0.115, 0.42, 5, FLANNEL);
+    upper.position.set(side * 0.42, 0.96, 0);
+    upper.rotation.z = side * -0.13;
+    g.add(upper);
+    const lower = cyl(0.075, 0.095, 0.38, 5, LJ_SKIN);
+    lower.position.set(side * 0.45, 0.60, 0);
+    lower.rotation.z = side * -0.13;
+    g.add(lower);
+    const hand = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), mat(LJ_SKIN));
+    hand.castShadow = true;
+    hand.position.set(side * 0.47, 0.33, 0);
+    g.add(hand);
+  });
+
+  // ── Legs ──
+  [-0.18, 0.18].forEach(lx => {
+    const upper = cyl(0.12, 0.135, 0.46, 5, DENIM);
+    upper.position.set(lx, 0.56, 0);
+    g.add(upper);
+    const lower = cyl(0.10, 0.12, 0.42, 5, DENIM);
+    lower.position.set(lx, 0.13, 0);
+    g.add(lower);
+    const boot = box(0.26, 0.16, 0.40, BOOT_C);
+    boot.position.set(lx, -0.14, 0.06);
+    g.add(boot);
+  });
+
+  // ── Large axe prop resting at his right side ──
+  const axeProp = new THREE.Group();
+  const hndl = cyl(0.040, 0.055, 1.20, 5, 0x5c3a1a);
+  hndl.position.y = 0.60;
+  axeProp.add(hndl);
+  // Blade (large, perpendicular to handle)
+  const bladeMain = box(0.16, 0.80, 0.68, 0x7a8fa0);
+  bladeMain.position.set(0, 1.24, 0.34);
+  axeProp.add(bladeMain);
+  const bladeEdge = box(0.14, 0.80, 0.12, 0xc8d8e4);
+  bladeEdge.position.set(0, 1.24, 0.70);
+  axeProp.add(bladeEdge);
+  const poll = box(0.14, 0.40, 0.16, 0x607080);
+  poll.position.set(0, 1.24, 0);
+  axeProp.add(poll);
+  // Axe leans outward from his right side (local +X = world +X when facing +Z)
+  axeProp.position.set(0.80, 0, 0.12);
+  axeProp.rotation.z = 0.20;
+  g.add(axeProp);
+
+  // ── Decorative log pile beside him (left side) ──
+  [-0.22, 0, 0.22].forEach(lx => {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.72, 6), mat(0x7a5230));
+    log.rotation.z = Math.PI / 2;
+    log.position.set(-0.80 + lx * 0.5, 0.13, 0);
+    g.add(log);
+  });
+
+  // Lumberjack at z=-13, facing +Z toward the player
+  g.position.set(0, 0.085, -13);
+  g.rotation.y = 0;
+  scene.add(g);
+
+  // Big tree to his right (from player's view), slightly behind
+  makeBigTree(2.5, -16.5, biome);
+}
+
+// ── Trading Post ──────────────────────────────────────────────────────
+function makeTradingPost(biome) {
+  let postCol, roofCol, wallCol, cntCol, flrCol, accentCol;
+  if (biome === 'savanna') {
+    postCol=0xb07810; wallCol=0xc49020; roofCol=0x9a6a08;
+    cntCol=0xd4a030; flrCol=0xb87820; accentCol=0x7a5005;
+  } else if (biome === 'ice') {
+    postCol=0x6878a0; wallCol=0x7888b8; roofCol=0x485868;
+    cntCol=0x7080a8; flrCol=0x586878; accentCol=0x384858;
+  } else {
+    postCol=0x6b4420; wallCol=0x7a5230; roofCol=0x4a2e0f;
+    cntCol=0x8b6340; flrCol=0x7a5230; accentCol=0x2e1a08;
+  }
+
+  const g = new THREE.Group();
+  g.position.set(0, 0, 13); // post sits at z=13; open counter faces player at z=0
+
+  // Platform
+  const plat = box(5.4, 0.20, 4.4, flrCol);
+  plat.position.set(0, 0.10, 0.2);
+  g.add(plat);
+
+  // Back wall (local +Z = world +Z = away from player)
+  const bk = box(5.4, 3.0, 0.22, wallCol);
+  bk.position.set(0, 1.70, 2.11);
+  g.add(bk);
+
+  // Side walls
+  [-2.6, 2.6].forEach(wx => {
+    const sw = box(0.22, 3.0, 4.4, wallCol);
+    sw.position.set(wx, 1.70, 0.2);
+    g.add(sw);
+  });
+
+  // Two front posts framing the open counter side (local -Z = toward player)
+  [[-2.3, -1.82], [2.3, -1.82]].forEach(([px, pz]) => {
+    const post = cyl(0.12, 0.14, 3.4, 6, postCol);
+    post.position.set(px, 1.70, pz);
+    g.add(post);
+  });
+
+  // Roof — overhanging all sides
+  const roof = box(6.0, 0.26, 5.2, roofCol);
+  roof.position.set(0, 3.38, 0.2);
+  g.add(roof);
+  const ridge = box(6.0, 0.22, 0.38, accentCol);
+  ridge.position.set(0, 3.51, 0.2);
+  g.add(ridge);
+
+  // Counter top + front panel
+  const cntT = box(4.6, 0.15, 0.80, cntCol);
+  cntT.position.set(0, 1.05, -1.20);
+  g.add(cntT);
+  const cntF = box(4.6, 0.90, 0.15, postCol);
+  cntF.position.set(0, 0.58, -1.62);
+  g.add(cntF);
+
+  // Sign above counter gap
+  const sign = box(2.2, 0.52, 0.15, cntCol);
+  sign.position.set(0, 3.02, -1.66);
+  g.add(sign);
+
+  // Goods on counter
+  [
+    {w:0.22,h:0.24,d:0.22, col:0xd4a060, x:-1.2, z:-1.2},
+    {w:0.18,h:0.20,d:0.18, col:0x80c060, x:-0.7, z:-1.1},
+    {w:0.20,h:0.17,d:0.20, col:0xe06030, x: 0.5, z:-1.15},
+    {w:0.15,h:0.24,d:0.15, col:0xc08820, x: 1.1, z:-1.2},
+  ].forEach(o => {
+    const it = new THREE.Mesh(new THREE.BoxGeometry(o.w, o.h, o.d), mat(o.col));
+    it.castShadow = true;
+    it.position.set(o.x, 1.17, o.z);
+    g.add(it);
+  });
+
+  // ── Ice extras: snow cap + icicles ──
+  if (biome === 'ice') {
+    const snow = box(5.9, 0.22, 5.1, 0xe2f2ff);
+    snow.position.set(0, 3.52, 0.2);
+    g.add(snow);
+
+    // Front edge icicles
+    for (let ix = -2.7; ix <= 2.7; ix += 0.44) {
+      const h = 0.28 + Math.random() * 0.40;
+      const ic = new THREE.Mesh(new THREE.ConeGeometry(0.045, h, 5), mat(0xb0d8f0));
+      ic.rotation.x = Math.PI; // point downward
+      ic.position.set(ix, 3.24 - h * 0.5, -2.4);
+      g.add(ic);
+    }
+    // Side edge icicles
+    for (const ixs of [-3.05, 3.05]) {
+      for (let iz = -1.8; iz <= 2.6; iz += 0.48) {
+        const h = 0.22 + Math.random() * 0.32;
+        const ic = new THREE.Mesh(new THREE.ConeGeometry(0.038, h, 5), mat(0xb0d8f0));
+        ic.rotation.x = Math.PI;
+        ic.position.set(ixs, 3.24 - h * 0.5, iz);
+        g.add(ic);
+      }
+    }
+    // Back edge icicles
+    for (let ix = -2.7; ix <= 2.7; ix += 0.44) {
+      const h = 0.20 + Math.random() * 0.28;
+      const ic = new THREE.Mesh(new THREE.ConeGeometry(0.038, h, 5), mat(0xb0d8f0));
+      ic.rotation.x = Math.PI;
+      ic.position.set(ix, 3.24 - h * 0.5, 2.8);
+      g.add(ic);
+    }
+  }
+
+  // ── Trader NPC ──
+  const trd = new THREE.Group();
+  const tShirt = biome==='savanna' ? 0xd4882a : biome==='ice' ? 0x3060b0 : 0x2980b9;
+  const tHatC  = biome==='savanna' ? 0x7a4a00 : biome==='ice' ? 0x1a2870 : 0x1a2a40;
+
+  // Torso
+  const ttorso = box(0.44, 0.62, 0.24, tShirt);
+  ttorso.position.y = 1.08;
+  trd.add(ttorso);
+
+  // Head
+  const thead = new THREE.Mesh(new THREE.DodecahedronGeometry(0.19, 0), mat(SKIN));
+  thead.castShadow = true;
+  thead.position.y = 1.60;
+  trd.add(thead);
+
+  // Hat dome + brim — dome tall enough to fully enclose the dodecahedron head top
+  const thatD = cyl(0.11, 0.23, 0.30, 6, tHatC); // taller, wider base
+  thatD.position.y = 1.78; // dome from y=1.63 to y=1.93, head top ≈1.79 → fully covered
+  trd.add(thatD);
+  const thatB = box(0.58, 0.08, 0.58, tHatC); // wide brim
+  thatB.position.y = 1.63;
+  trd.add(thatB);
+
+  // Eyes (at local +Z = front face; after rotation.y=π, front faces world -Z = toward player)
+  [-0.065, 0.065].forEach(ex => {
+    const eye = box(0.058, 0.040, 0.025, 0x111111);
+    eye.position.set(ex, 1.625, 0.155);
+    trd.add(eye);
+  });
+  // Mouth
+  const mouth = box(0.10, 0.028, 0.022, 0x7a2020);
+  mouth.position.set(0, 1.56, 0.155);
+  trd.add(mouth);
+
+  // Arms resting slightly forward on counter
+  [-0.26, 0.26].forEach(ax => {
+    const arm = box(0.10, 0.46, 0.10, tShirt);
+    arm.position.set(ax, 0.88, -0.08);
+    arm.rotation.x = -0.3;
+    trd.add(arm);
+  });
+
+  // Legs
+  [-0.12, 0.12].forEach(lx => {
+    const leg = box(0.14, 0.52, 0.14, 0x2c3e50);
+    leg.position.set(lx, 0.36, 0);
+    trd.add(leg);
+  });
+
+  // Trader inside behind counter; rotation.y=π so face points toward player
+  trd.position.set(0, 0, 0.72);
+  trd.rotation.y = Math.PI;
+  g.add(trd);
+
+  // ── Bystander NPC — same build as player, no cap, brown hair ──
+  const bys = new THREE.Group();
+
+  const BY_SHIRT = 0x2e8b3a; // green shirt
+
+  // Torso
+  const bTorso = box(0.50, 0.65, 0.26, BY_SHIRT);
+  bTorso.position.y = 1.08;
+  bys.add(bTorso);
+
+  // Neck
+  const bNeck = cyl(0.07, 0.08, 0.10, 5, SKIN);
+  bNeck.position.y = 1.46;
+  bys.add(bNeck);
+
+  // Head group (matches player headGroup offset)
+  const bHG = new THREE.Group();
+  bHG.position.y = 1.66;
+  bys.add(bHG);
+
+  const bHeadMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.21, 0), mat(SKIN));
+  bHeadMesh.castShadow = true;
+  bHG.add(bHeadMesh);
+
+  // Brown hair — flat cylinder hugging top of head
+  const bHair = cyl(0.17, 0.215, 0.10, 6, 0x5c3010);
+  bHair.position.y = 0.22;
+  bHG.add(bHair);
+
+  // Eyes
+  [-0.07, 0.07].forEach(x => {
+    const eye = box(0.07, 0.045, 0.025, 0x111111);
+    eye.position.set(x, 0.04, 0.155);
+    bHG.add(eye);
+  });
+
+  // Arms (both hanging naturally)
+  [-1, 1].forEach(side => {
+    const bAG = new THREE.Group();
+    bAG.position.set(side * 0.32, 1.30, 0);
+    const bUA = cyl(0.07, 0.08, 0.34, 5, BY_SHIRT); bUA.position.y = -0.17; bAG.add(bUA);
+    const bLA = cyl(0.055, 0.07, 0.30, 5, SKIN);    bLA.position.y = -0.49; bAG.add(bLA);
+    const bHA = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), mat(SKIN));
+    bHA.position.y = -0.69; bAG.add(bHA);
+    bys.add(bAG);
+  });
+
+  // Legs
+  [-1, 1].forEach(side => {
+    const bg = new THREE.Group();
+    bg.position.set(side * 0.13, 0.76, 0);
+    const bULeg = cyl(0.09, 0.10, 0.38, 5, PANTS); bULeg.position.y = -0.19; bg.add(bULeg);
+    const bLLeg = cyl(0.07, 0.09, 0.36, 5, PANTS); bLLeg.position.y = -0.57; bg.add(bLLeg);
+    const bFoot = box(0.17, 0.09, 0.27, SHOES); bFoot.position.set(0, -0.80, 0.06); bg.add(bFoot);
+    bys.add(bg);
+  });
+
+  bys.position.set(0.9, 0, 2.85);
+  g.add(bys);
+
+  scene.add(g);
+
+  // ── Solid AABB collision for all walls (world space; group is at z=13, no rotation) ──
+  // Interior block: everything behind the counter front (world z 11.28–15.25)
+  boxes.push({ minX: -2.49, maxX:  2.49, minZ: 11.28, maxZ: 15.25 });
+  // Left wall (world x 2.49–2.82), full depth of building
+  boxes.push({ minX:  2.49, maxX:  2.82, minZ: 10.60, maxZ: 15.25 });
+  // Right wall (world x −2.82–−2.49), full depth of building
+  boxes.push({ minX: -2.82, maxX: -2.49, minZ: 10.60, maxZ: 15.25 });
+}
+
+// ── Outfit recolouring ────────────────────────────────────────────────
+function setOutfit(biome) {
+  let shirt, pants, shoes, capMain, capDark;
+  if (biome === 'savanna') {
+    // Safari — khaki shirt, khaki trousers, tan leather boots, khaki cap
+    shirt   = 0xd4c478;
+    pants   = 0xb8a858;
+    shoes   = 0x8b6b30;
+    capMain = 0xc8a840;
+    capDark = 0x9a8020;
+  } else if (biome === 'ice') {
+    // Furry animal-skin coat — warm tawny hide, dark fur leggings, fur boots, fur cap
+    shirt   = 0xb07838;
+    pants   = 0x6a4022;
+    shoes   = 0x3e2410;
+    capMain = 0x5a3418;
+    capDark = 0x3a2008;
+  } else {
+    // Prairie — default red shirt, dark jeans, black shoes, navy cap
+    shirt   = 0xe74c3c;
+    pants   = 0x2c3e50;
+    shoes   = 0x1a1a1a;
+    capMain = 0x1a3c6e;
+    capDark = 0x0d2137;
+  }
+  shirtMeshes.forEach(m => m.material.color.setHex(shirt));
+  pantsMeshes.forEach(m => m.material.color.setHex(pants));
+  shoesMeshes.forEach(m => m.material.color.setHex(shoes));
+  // Long sleeves in ice biome (lower arm matches coat); bare arms otherwise
+  const sleeveCol = (biome === 'ice') ? shirt : SKIN;
+  sleeveMeshes.forEach(m => m.material.color.setHex(sleeveCol));
+  // capMeshes: [dome, button, brim, brimUnder]
+  capMeshes[0].material.color.setHex(capMain);
+  capMeshes[1].material.color.setHex(capDark);
+  capMeshes[2].material.color.setHex(capMain);
+  capMeshes[3].material.color.setHex(capDark);
+}
+
+function drawMap() {
+  const canvas = document.getElementById('mapCanvas');
+  const S = 600;
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  const W = 52; // world half-extent shown
+
+  function px(wx) { return (wx + W) / (W * 2) * S; }
+  function pz(wz) { return S - (wz + W) / (W * 2) * S; }
+
+  // Parchment background
+  const bg = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S * 0.78);
+  bg.addColorStop(0, '#ede0b0'); bg.addColorStop(1, '#c0963c');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, S, S);
+
+  // Subtle grain
+  for (let i = 0; i < 3000; i++) {
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.018)';
+    ctx.fillRect(Math.random()*S, Math.random()*S, 2, 2);
+  }
+
+  // Biome tint
+  ctx.fillStyle = currentBiome === 'savanna' ? 'rgba(160,120,20,0.10)'
+                : currentBiome === 'ice'     ? 'rgba(160,200,240,0.13)'
+                : 'rgba(40,100,30,0.09)';
+  ctx.fillRect(0, 0, S, S);
+
+  // Title
+  ctx.fillStyle = '#4a2c08'; ctx.font = 'bold 20px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('~ MAP OF THE LAND ~', S/2, 34);
+
+  // Dotted path between lumberjack ↔ spawn ↔ trading post
+  ctx.strokeStyle = 'rgba(100,65,18,0.55)'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 7]);
+  ctx.beginPath(); ctx.moveTo(px(0), pz(-16)); ctx.lineTo(px(0), pz(17)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Big tree (2.5, -16.5) ──
+  ctx.fillStyle = '#1e4f14'; ctx.beginPath(); ctx.arc(px(2.5), pz(-16.5), 11, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#3a8030'; ctx.beginPath(); ctx.arc(px(2.5), pz(-16.5), 7,  0, Math.PI*2); ctx.fill();
+
+  // ── Lumberjack hut (0, -13) ──
+  ctx.fillStyle = '#7a4018'; ctx.fillRect(px(0)-10, pz(-13)-10, 20, 20);
+  ctx.fillStyle = '#e8c060'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('LJ', px(0), pz(-13)+5);
+
+  // ── Trading post (0, 13) ──
+  ctx.fillStyle = '#8b6020'; ctx.fillRect(px(0)-15, pz(13)-9, 30, 18);
+  ctx.fillStyle = '#5a3810'; ctx.fillRect(px(0)-15, pz(13)-15, 30, 6);
+
+  // ── Bystander (0.9, 15.85) ──
+  ctx.fillStyle = '#2e8b3a'; ctx.strokeStyle = '#1a5a22'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(px(0.9), pz(15.85), 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  // ── Spawn star (0, 0) ──
+  ctx.fillStyle = '#e8c030'; ctx.strokeStyle = '#9a7a10'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? 11 : 5;
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    i === 0 ? ctx.moveTo(px(0)+Math.cos(a)*r, pz(0)+Math.sin(a)*r)
+            : ctx.lineTo(px(0)+Math.cos(a)*r, pz(0)+Math.sin(a)*r);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── Labels ──
+  function lbl(text, x, y) {
+    ctx.font = '11px monospace'; ctx.textAlign = 'center';
+    const w = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(237,224,170,0.82)';
+    ctx.fillRect(x - w/2 - 4, y - 12, w + 8, 15);
+    ctx.fillStyle = '#3a1e04'; ctx.fillText(text, x, y);
+  }
+  lbl('Big Tree',     px(2.5),  pz(-16.5) + 25);
+  lbl('Lumberjack',   px(0),    pz(-13)   - 18);
+  lbl('Trading Post', px(0),    pz(13)    + 27);
+  lbl('? stranger',   px(0.9),  pz(15.85) - 15);
+  lbl('SPAWN',        px(0),    pz(0)     - 20);
+
+  // ── Compass rose ──
+  const [cr, cc] = [S - 52, 52];
+  ctx.fillStyle = '#5a3810'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'center';
+  ctx.fillText('N', cr, cc - 24); ctx.fillText('S', cr, cc + 30);
+  ctx.fillText('W', cr - 24, cc + 5); ctx.fillText('E', cr + 24, cc + 5);
+  ctx.strokeStyle = '#5a3810'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(cr, cc-16); ctx.lineTo(cr, cc+16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cr-16, cc); ctx.lineTo(cr+16, cc); ctx.stroke();
+
+  // ── Double border ──
+  ctx.strokeStyle = '#7a5020'; ctx.lineWidth = 6;
+  ctx.strokeRect(5, 5, S-10, S-10);
+  ctx.strokeStyle = '#b09840'; ctx.lineWidth = 2;
+  ctx.strokeRect(14, 14, S-28, S-28);
+}
+
+function startGame(biome) {
+  document.getElementById('selectScreen').style.display = 'none';
+  currentBiome = biome;
+
+  if (biome === 'savanna') {
+    scene.background = new THREE.Color(0xd4a843);
+    scene.fog = new THREE.FogExp2(0xd4a843, 0.006);
+    ground.material.color.set(0xb89040);
+    sun.color.set(0xffcc66);
+    // Acacia trees
+    placeObjects(90, 12, 240, 8, makeAcacia);
+    // Dry grass tufts in two shades
+    placeObjects(500, 4, 230, 3, (x,z) => makeGrassTuft(x, z, Math.random()<0.5 ? 0xc4a030 : 0xa08828));
+  } else if (biome === 'ice') {
+    scene.background = new THREE.Color(0xc8dff0);
+    scene.fog = new THREE.FogExp2(0xd8eaf8, 0.008);
+    ground.material.color.set(0xe8f4ff);
+    sun.color.set(0xd0eeff);
+    sun.intensity = 0.85;
+    // Snow-covered evergreen trees
+    placeObjects(100, 12, 240, 8, makeEvergreenSnow);
+    // Snow mounds scattered around
+    placeObjects(300, 3, 230, 3, makeSnowPatch);
+  } else {
+    // Prairie — keep default sky
+    ground.material.color.set(0x5a8a3c);
+    // Pine trees
+    placeObjects(110, 14, 240, 8, makePine);
+    // Short grass tufts
+    placeObjects(600, 3, 230, 3, makePrairieGrass);
+    // Wildflowers in clusters
+    placeObjects(38, 4, 220, 4, (cx, cz) => {
+      const count = 4 + Math.floor(Math.random() * 7); // 4–10 per cluster
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.random() * 2.2;
+        makeFlower(cx + Math.cos(a) * r, cz + Math.sin(a) * r);
+      }
+    });
+  }
+
+  setOutfit(biome);
+  makeLumberjack(biome);
+  makeTradingPost(biome);
+  animate();
+}
+</script>
+</body>
+</html>
